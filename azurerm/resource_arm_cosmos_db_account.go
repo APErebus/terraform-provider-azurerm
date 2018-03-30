@@ -36,35 +36,22 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 			ov, nv := diff.GetChange("geo_location")
 
 			//map old locations and then compare each one to its new ID to detect the change
-			oldLocationMap := map[string]interface{}{}
+			oldMap := map[string]interface{}{}
 			for _, l := range ov.(*schema.Set).List() {
 				location := l.(map[string]interface{})
-				oldLocationMap[location["id"].(string)] = location
-			}
-			oldLocationSet := ov.(*schema.Set)
-			newLocationSet := nv.(*schema.Set)
-
-			/*			location := documentdb.Location{
-							LocationName:     utils.String(azureRMNormalizeLocation(data["location"].(string))),
-							FailoverPriority: utils.Int32(int32(data["failover_priority"].(int))),
-						}
-
-						if v, ok := data["id"].(string); ok {*/
-
-			//old generated ID:
-			//new genereated ID
-
-			//has set changed?
-			if setDifference := oldLocationSet.Difference(newLocationSet); setDifference.Len() != 0 {
-				log.Printf("KTKT diff: %v", setDifference)
-				//set changed, do we need to do something?
+				oldMap[azureRMNormalizeLocation(location["location"].(string))] = location
 			}
 
-			/*if ov.(map[string]interface{})["id"].(string) != nv.(map[string]interface{})["id"].(string) {
-				diff.ForceNew("geo_location")
-			}*/
-			log.Printf("KTKT old: %v", oldLocationSet)
-			log.Printf("KTKT new: %v", newLocationSet)
+			for _, l := range nv.(*schema.Set).List() {
+				new := l.(map[string]interface{})
+				if o, ok := oldMap[azureRMNormalizeLocation(new["location"].(string))]; ok {
+
+					old := o.(map[string]interface{})
+					if old["name"] != new["name"] {
+						diff.ForceNew("geo_location")
+					}
+				}
+			}
 
 			return nil
 		},
@@ -75,8 +62,8 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 				Required: true,
 				ForceNew: true,
 				ValidateFunc: validation.StringMatch(
-					regexp.MustCompile("^[-a-z0-9]{3,31}$"),
-					"Cosmos DB Account Name name must be 3 - 31 characters long, contain only letters, numbers and hyphens.",
+					regexp.MustCompile("^[-a-z0-9]{3,50}$"),
+					"Cosmos DB Account Name name must be 3 - 50 characters long, contain only letters, numbers and hyphens.",
 				),
 			},
 
@@ -119,7 +106,7 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 			},
 
 			"consistency_policy": {
-				Type:     schema.TypeSet,
+				Type:     schema.TypeList,
 				Required: true,
 				MaxItems: 1,
 				Elem: &schema.Resource{
@@ -152,7 +139,6 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 						},
 					},
 				},
-				Set: resourceAzureRMCosmosDBAccountConsistencyPolicyHash,
 			},
 
 			// this actually maps to the Location field in the API/SDK on create/update so has been renamed
@@ -168,10 +154,6 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 							Type:     schema.TypeString,
 							Optional: true,
 							Computed: true,
-							ValidateFunc: validation.StringMatch(
-								regexp.MustCompile("^[-a-z0-9]{3,31}$"),
-								"Cosmos DB location ID must be 3 - 31 characters long, contain only letters, numbers and hyphens.",
-							),
 						},
 
 						"location": {
@@ -199,9 +181,17 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 
-						"id": {
+						"name": {
 							Type:     schema.TypeString,
 							Optional: true,
+							ValidateFunc: validation.StringMatch(
+								regexp.MustCompile("^[-a-z0-9]{3,50}$"),
+								"Cosmos DB location name (ID) must be 3 - 50 characters long, contain only letters, numbers and hyphens.",
+							),
+						},
+
+						"id": {
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 
@@ -217,16 +207,6 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 							Required:     true,
 							ValidateFunc: validation.IntAtLeast(0),
 						},
-
-						"read_endpoint": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-
-						"write_endpoint": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
 					},
 				},
 				Set: resourceAzureRMCosmosDBAccountGeoLocationHash,
@@ -237,6 +217,22 @@ func resourceArmCosmosDBAccount() *schema.Resource {
 			"endpoint": {
 				Type:     schema.TypeString,
 				Computed: true,
+			},
+
+			"read_endpoints": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+
+			"write_endpoints": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
 			},
 
 			"primary_master_key": {
@@ -410,6 +406,18 @@ func resourceArmCosmosDBAccountRead(d *schema.ResourceData, meta interface{}) er
 		return fmt.Errorf("Neither `geo_location` or `failover_policy` is set for CosmosDB Account '%s'", name)
 	}
 
+	readEndpoints := []string{}
+	for _, l := range *resp.ReadLocations {
+		readEndpoints = append(readEndpoints, *l.DocumentEndpoint)
+	}
+	d.Set("read_endpoints", readEndpoints)
+
+	writeEndpoints := []string{}
+	for _, l := range *resp.WriteLocations {
+		writeEndpoints = append(writeEndpoints, *l.DocumentEndpoint)
+	}
+	d.Set("write_endpoints", writeEndpoints)
+
 	keys, err := client.ListKeys(ctx, resourceGroup, name)
 	if err != nil {
 		log.Printf("[ERROR] Unable to List Write keys for CosmosDB Account %s: %s", name, err)
@@ -460,7 +468,7 @@ func resourceArmCosmosDBAccountDelete(d *schema.ResourceData, meta interface{}) 
 }
 
 func expandAzureRmCosmosDBAccountConsistencyPolicy(d *schema.ResourceData) *documentdb.ConsistencyPolicy {
-	input := d.Get("consistency_policy").(*schema.Set).List()[0].(map[string]interface{})
+	input := d.Get("consistency_policy").([]interface{})[0].(map[string]interface{})
 
 	consistencyLevel := input["consistency_level"].(string)
 	policy := documentdb.ConsistencyPolicy{
@@ -492,11 +500,12 @@ func expandAzureRmCosmosDBAccountGeoLocations(databaseName string, d *schema.Res
 			FailoverPriority: utils.Int32(int32(data["failover_priority"].(int))),
 		}
 
-		if v, ok := data["id"].(string); ok {
-			location.ID = utils.String(v)
+		if v, ok := data["name"].(string); ok {
+			data["id"] = v
 		} else {
-			location.ID = utils.String(resourceArmCosmosDBAccountGenerateDefaultId(databaseName, *location.LocationName))
+			data["id"] = utils.String(resourceArmCosmosDBAccountGenerateDefaultId(databaseName, *location.LocationName))
 		}
+		location.ID = utils.String(data["id"].(string))
 
 		locations = append(locations, location)
 	}
@@ -581,17 +590,13 @@ func expandAzureRmCosmosDBAccountFailoverPolicy(databaseName string, d *schema.R
 }
 
 func flattenAndSetAzureRmCosmosDBAccountConsistencyPolicy(d *schema.ResourceData, policy *documentdb.ConsistencyPolicy) {
-	results := schema.Set{
-		F: resourceAzureRMCosmosDBAccountConsistencyPolicyHash,
-	}
 
 	result := map[string]interface{}{}
 	result["consistency_level"] = string(policy.DefaultConsistencyLevel)
 	result["max_interval_in_seconds"] = int(*policy.MaxIntervalInSeconds) //TODO need a nil check?
 	result["max_staleness_prefix"] = int(*policy.MaxStalenessPrefix)
-	results.Add(result)
 
-	d.Set("consistency_policy", &results)
+	d.Set("consistency_policy", &[]interface{}{result})
 }
 
 //todo remove when failover_policy field is removed
@@ -618,31 +623,13 @@ func flattenAndSetAzureRmCosmosDBAccountGeoLocations(d *schema.ResourceData, acc
 		F: resourceAzureRMCosmosDBAccountGeoLocationHash,
 	}
 
-	locationMap := map[string]map[string]interface{}{} //map so we can easily set the read and write locations
 	for _, l := range *account.FailoverPolicies {
 		lb := map[string]interface{}{
 			"id":                *l.ID,
 			"location":          azureRMNormalizeLocation(*l.LocationName),
 			"failover_priority": int(*l.FailoverPriority),
 		}
-
-		locationMap[*l.ID] = lb
 		locationSet.Add(lb)
-	}
-
-	for _, l := range *account.ReadLocations {
-		if lb, ok := locationMap[*l.ID]; ok {
-			lb["read_endpoint"] = *l.DocumentEndpoint
-		} else {
-			return fmt.Errorf("Unable to find matching location for read endpoint '%s'", *l.DocumentEndpoint)
-		}
-	}
-	for _, l := range *account.WriteLocations {
-		if lb, ok := locationMap[*l.ID]; ok {
-			lb["write_endpoint"] = *l.DocumentEndpoint
-		} else {
-			return fmt.Errorf("Unable to find matching location for write endpoint '%s'", *l.DocumentEndpoint)
-		}
 	}
 
 	return d.Set("geo_location", &locationSet)
@@ -678,10 +665,14 @@ func resourceAzureRMCosmosDBAccountGeoLocationHash(v interface{}) int {
 	var buf bytes.Buffer
 	m := v.(map[string]interface{})
 
+	name := ""
+	if v, ok := m["name"].(string); ok {
+		name = v
+	}
 	location := azureRMNormalizeLocation(m["location"].(string))
 	priority := int32(m["failover_priority"].(int))
 
-	buf.WriteString(fmt.Sprintf("-%s-%d", location, priority))
+	buf.WriteString(fmt.Sprintf("%s-%s-%d", name, location, priority))
 
 	return hashcode.String(buf.String())
 }
