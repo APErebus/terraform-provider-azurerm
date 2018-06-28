@@ -408,8 +408,8 @@ func resourceArmFunctionAppRead(d *schema.ResourceData, meta interface{}) error 
 	delete(appSettings, "AzureWebJobsDashboard")
 	delete(appSettings, "AzureWebJobsStorage")
 	delete(appSettings, "FUNCTIONS_EXTENSION_VERSION")
-	delete(appSettings, "WEBSITE_CONTENTSHARE")
-	delete(appSettings, "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING")
+	// delete(appSettings, "WEBSITE_CONTENTSHARE")
+	// delete(appSettings, "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING")
 
 	if err := d.Set("app_settings", appSettings); err != nil {
 		return err
@@ -462,19 +462,19 @@ func getBasicFunctionAppAppSettings(d *schema.ResourceData) []web.NameValuePair 
 	dashboardPropName := "AzureWebJobsDashboard"
 	storagePropName := "AzureWebJobsStorage"
 	functionVersionPropName := "FUNCTIONS_EXTENSION_VERSION"
-	contentSharePropName := "WEBSITE_CONTENTSHARE"
-	contentFileConnStringPropName := "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"
+	// contentSharePropName := "WEBSITE_CONTENTSHARE"
+	// contentFileConnStringPropName := "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING"
 
 	storageConnection := d.Get("storage_connection_string").(string)
 	functionVersion := d.Get("version").(string)
-	contentShare := d.Get("name").(string) + "-content"
+	// contentShare := d.Get("name").(string) + "-content"
 
 	return []web.NameValuePair{
 		{Name: &dashboardPropName, Value: &storageConnection},
 		{Name: &storagePropName, Value: &storageConnection},
 		{Name: &functionVersionPropName, Value: &functionVersion},
-		{Name: &contentSharePropName, Value: &contentShare},
-		{Name: &contentFileConnStringPropName, Value: &storageConnection},
+		// {Name: &contentSharePropName, Value: &contentShare},
+		// {Name: &contentFileConnStringPropName, Value: &storageConnection},
 	}
 }
 
