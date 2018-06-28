@@ -42,11 +42,12 @@ func NewCustomDomainsClientWithBaseURI(baseURI string, subscriptionID string) Cu
 }
 
 // Create creates a new custom domain within an endpoint.
-//
-// resourceGroupName is name of the Resource group within the Azure subscription. profileName is name of the CDN
-// profile which is unique within the resource group. endpointName is name of the endpoint under the profile which is
-// unique globally. customDomainName is name of the custom domain within an endpoint. customDomainProperties is
-// properties required to create a new custom domain.
+// Parameters:
+// resourceGroupName - name of the Resource group within the Azure subscription.
+// profileName - name of the CDN profile which is unique within the resource group.
+// endpointName - name of the endpoint under the profile which is unique globally.
+// customDomainName - name of the custom domain within an endpoint.
+// customDomainProperties - properties required to create a new custom domain.
 func (client CustomDomainsClient) Create(ctx context.Context, resourceGroupName string, profileName string, endpointName string, customDomainName string, customDomainProperties CustomDomainParameters) (result CustomDomainsCreateFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
@@ -56,7 +57,7 @@ func (client CustomDomainsClient) Create(ctx context.Context, resourceGroupName 
 		{TargetValue: customDomainProperties,
 			Constraints: []validation.Constraint{{Target: "customDomainProperties.CustomDomainPropertiesParameters", Name: validation.Null, Rule: false,
 				Chain: []validation.Constraint{{Target: "customDomainProperties.CustomDomainPropertiesParameters.HostName", Name: validation.Null, Rule: true, Chain: nil}}}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "cdn.CustomDomainsClient", "Create")
+		return result, validation.NewError("cdn.CustomDomainsClient", "Create", err.Error())
 	}
 
 	req, err := client.CreatePreparer(ctx, resourceGroupName, profileName, endpointName, customDomainName, customDomainProperties)
@@ -90,7 +91,7 @@ func (client CustomDomainsClient) CreatePreparer(ctx context.Context, resourceGr
 	}
 
 	preparer := autorest.CreatePreparer(
-		autorest.AsJSON(),
+		autorest.AsContentType("application/json; charset=utf-8"),
 		autorest.AsPut(),
 		autorest.WithBaseURL(client.BaseURI),
 		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Cdn/profiles/{profileName}/endpoints/{endpointName}/customDomains/{customDomainName}", pathParameters),
@@ -102,15 +103,17 @@ func (client CustomDomainsClient) CreatePreparer(ctx context.Context, resourceGr
 // CreateSender sends the Create request. The method will close the
 // http.Response Body if it receives an error.
 func (client CustomDomainsClient) CreateSender(req *http.Request) (future CustomDomainsCreateFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated, http.StatusAccepted))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated, http.StatusAccepted))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -128,17 +131,18 @@ func (client CustomDomainsClient) CreateResponder(resp *http.Response) (result C
 }
 
 // Delete deletes an existing custom domain within an endpoint.
-//
-// resourceGroupName is name of the Resource group within the Azure subscription. profileName is name of the CDN
-// profile which is unique within the resource group. endpointName is name of the endpoint under the profile which is
-// unique globally. customDomainName is name of the custom domain within an endpoint.
+// Parameters:
+// resourceGroupName - name of the Resource group within the Azure subscription.
+// profileName - name of the CDN profile which is unique within the resource group.
+// endpointName - name of the endpoint under the profile which is unique globally.
+// customDomainName - name of the custom domain within an endpoint.
 func (client CustomDomainsClient) Delete(ctx context.Context, resourceGroupName string, profileName string, endpointName string, customDomainName string) (result CustomDomainsDeleteFuture, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "cdn.CustomDomainsClient", "Delete")
+		return result, validation.NewError("cdn.CustomDomainsClient", "Delete", err.Error())
 	}
 
 	req, err := client.DeletePreparer(ctx, resourceGroupName, profileName, endpointName, customDomainName)
@@ -182,15 +186,17 @@ func (client CustomDomainsClient) DeletePreparer(ctx context.Context, resourceGr
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client CustomDomainsClient) DeleteSender(req *http.Request) (future CustomDomainsDeleteFuture, err error) {
-	sender := autorest.DecorateSender(client, azure.DoRetryWithRegistration(client.Client))
-	future.Future = azure.NewFuture(req)
-	future.req = req
-	_, err = future.Done(sender)
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req,
+		azure.DoRetryWithRegistration(client.Client))
 	if err != nil {
 		return
 	}
-	err = autorest.Respond(future.Response(),
-		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	err = autorest.Respond(resp, azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted, http.StatusNoContent))
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
 	return
 }
 
@@ -208,17 +214,18 @@ func (client CustomDomainsClient) DeleteResponder(resp *http.Response) (result C
 }
 
 // DisableCustomHTTPS disable https delivery of the custom domain.
-//
-// resourceGroupName is name of the Resource group within the Azure subscription. profileName is name of the CDN
-// profile which is unique within the resource group. endpointName is name of the endpoint under the profile which is
-// unique globally. customDomainName is name of the custom domain within an endpoint.
+// Parameters:
+// resourceGroupName - name of the Resource group within the Azure subscription.
+// profileName - name of the CDN profile which is unique within the resource group.
+// endpointName - name of the endpoint under the profile which is unique globally.
+// customDomainName - name of the custom domain within an endpoint.
 func (client CustomDomainsClient) DisableCustomHTTPS(ctx context.Context, resourceGroupName string, profileName string, endpointName string, customDomainName string) (result CustomDomain, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "cdn.CustomDomainsClient", "DisableCustomHTTPS")
+		return result, validation.NewError("cdn.CustomDomainsClient", "DisableCustomHTTPS", err.Error())
 	}
 
 	req, err := client.DisableCustomHTTPSPreparer(ctx, resourceGroupName, profileName, endpointName, customDomainName)
@@ -286,17 +293,18 @@ func (client CustomDomainsClient) DisableCustomHTTPSResponder(resp *http.Respons
 }
 
 // EnableCustomHTTPS enable https delivery of the custom domain.
-//
-// resourceGroupName is name of the Resource group within the Azure subscription. profileName is name of the CDN
-// profile which is unique within the resource group. endpointName is name of the endpoint under the profile which is
-// unique globally. customDomainName is name of the custom domain within an endpoint.
+// Parameters:
+// resourceGroupName - name of the Resource group within the Azure subscription.
+// profileName - name of the CDN profile which is unique within the resource group.
+// endpointName - name of the endpoint under the profile which is unique globally.
+// customDomainName - name of the custom domain within an endpoint.
 func (client CustomDomainsClient) EnableCustomHTTPS(ctx context.Context, resourceGroupName string, profileName string, endpointName string, customDomainName string) (result CustomDomain, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "cdn.CustomDomainsClient", "EnableCustomHTTPS")
+		return result, validation.NewError("cdn.CustomDomainsClient", "EnableCustomHTTPS", err.Error())
 	}
 
 	req, err := client.EnableCustomHTTPSPreparer(ctx, resourceGroupName, profileName, endpointName, customDomainName)
@@ -364,17 +372,18 @@ func (client CustomDomainsClient) EnableCustomHTTPSResponder(resp *http.Response
 }
 
 // Get gets an exisitng custom domain within an endpoint.
-//
-// resourceGroupName is name of the Resource group within the Azure subscription. profileName is name of the CDN
-// profile which is unique within the resource group. endpointName is name of the endpoint under the profile which is
-// unique globally. customDomainName is name of the custom domain within an endpoint.
+// Parameters:
+// resourceGroupName - name of the Resource group within the Azure subscription.
+// profileName - name of the CDN profile which is unique within the resource group.
+// endpointName - name of the endpoint under the profile which is unique globally.
+// customDomainName - name of the custom domain within an endpoint.
 func (client CustomDomainsClient) Get(ctx context.Context, resourceGroupName string, profileName string, endpointName string, customDomainName string) (result CustomDomain, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "cdn.CustomDomainsClient", "Get")
+		return result, validation.NewError("cdn.CustomDomainsClient", "Get", err.Error())
 	}
 
 	req, err := client.GetPreparer(ctx, resourceGroupName, profileName, endpointName, customDomainName)
@@ -442,17 +451,17 @@ func (client CustomDomainsClient) GetResponder(resp *http.Response) (result Cust
 }
 
 // ListByEndpoint lists all of the existing custom domains within an endpoint.
-//
-// resourceGroupName is name of the Resource group within the Azure subscription. profileName is name of the CDN
-// profile which is unique within the resource group. endpointName is name of the endpoint under the profile which is
-// unique globally.
+// Parameters:
+// resourceGroupName - name of the Resource group within the Azure subscription.
+// profileName - name of the CDN profile which is unique within the resource group.
+// endpointName - name of the endpoint under the profile which is unique globally.
 func (client CustomDomainsClient) ListByEndpoint(ctx context.Context, resourceGroupName string, profileName string, endpointName string) (result CustomDomainListResultPage, err error) {
 	if err := validation.Validate([]validation.Validation{
 		{TargetValue: resourceGroupName,
 			Constraints: []validation.Constraint{{Target: "resourceGroupName", Name: validation.MaxLength, Rule: 90, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.MinLength, Rule: 1, Chain: nil},
 				{Target: "resourceGroupName", Name: validation.Pattern, Rule: `^[-\w\._\(\)]+$`, Chain: nil}}}}); err != nil {
-		return result, validation.NewErrorWithValidationError(err, "cdn.CustomDomainsClient", "ListByEndpoint")
+		return result, validation.NewError("cdn.CustomDomainsClient", "ListByEndpoint", err.Error())
 	}
 
 	result.fn = client.listByEndpointNextResults
